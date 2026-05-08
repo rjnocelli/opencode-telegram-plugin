@@ -1,0 +1,29 @@
+{
+  "name": "opencode-telegram-plugin",
+  "version": "0.1.0",
+  "description": "Sends a Telegram message when the opencode agent finishes and waits for input",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "telegram",
+    "notification"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "latest",
+    "@types/node": "^25.6.0",
+    "typescript": "^5.0.0"
+  }
+}

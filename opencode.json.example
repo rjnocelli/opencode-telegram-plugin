@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    [
+      "file:///path/to/opencode-telegram-plugin/dist/index.js",
+      {
+        "message": "opencode agent is waiting for your input",
+        "debug": false
+      }
+    ]
+  ]
+}
+
+// Credentials can be provided in three ways (listed in priority order):
+// 1. Plugin options: botToken, chatId (in the config above)
+// 2. Environment variables: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+//
+// The .env file is loaded automatically if present.
