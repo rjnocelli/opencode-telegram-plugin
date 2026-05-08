@@ -29,6 +29,12 @@ const retry = () => to("session.status", "retry")
 const sessIdle = () => to("session.idle")
 const permUpd = () => ({ event: { type: "permission.updated", properties: {} } } as any)
 const permRepl = () => ({ event: { type: "permission.replied", properties: { sessionID: "s1", permissionID: "p1", response: "yes" } } } as any)
+const sessionCreated = (id: string, title: string) => ({
+  event: { type: "session.created", properties: { info: { id, title } } },
+} as any)
+const sessionUpdated = (id: string, title: string) => ({
+  event: { type: "session.updated", properties: { info: { id, title } } },
+} as any)
 
 describe("opencode-telegram-plugin", () => {
   it("should be a function", () => {
@@ -45,7 +51,7 @@ describe("opencode-telegram-plugin", () => {
   it("should ignore non-relevant events", async () => {
     const { mock$, captured } = makeMock$()
     const hooks = await opencodeTelegramPlugin({ $: mock$ } as any)
-    await hooks.event!({ event: { type: "session.created" } as any })
+    await hooks.event!({ event: { type: "file.edited" } as any })
     await Bun.sleep(600)
     expect(captured.length).toBe(0)
   })
@@ -230,7 +236,99 @@ describe("opencode-telegram-plugin", () => {
       await hooks.event!(busy())
       await hooks.event!(idle())
       await Bun.sleep(600)
-      expect(captured.some((c: string) => c.includes("text='custom msg'"))).toBe(true)
+      expect(captured.some((c: string) => c.includes("text='custom msg [session: s1]'"))).toBe(true)
+    })
+  })
+
+  describe("session id", () => {
+    it("should include session id in message from session.status", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c" })
+      await hooks.event!(busy())
+      await hooks.event!(idle())
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("[session: s1]"))).toBe(true)
+    })
+
+    it("should include session id from session.idle fallback", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c" })
+      await hooks.event!(busy())
+      await hooks.event!(sessIdle())
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("[session: s1]"))).toBe(true)
+    })
+
+    it("should include session id from tool.execute.before for ask tools", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c" })
+      await (hooks as any)["tool.execute.before"]!({ tool: "ask", sessionID: "s2", callID: "c1" }, { args: {} })
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("[session: s2]"))).toBe(true)
+    })
+
+    it("should append session id to custom message", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c", message: "custom msg" })
+      await hooks.event!(busy())
+      await hooks.event!(idle())
+      await Bun.sleep(600)
+      const msg = captured.find((c: string) => c.includes("api.telegram.org"))
+      expect(msg).toBeDefined()
+      expect(msg).toContain("text='custom msg")
+      expect(msg).toContain("[session: s1]")
+    })
+  })
+
+  describe("session name", () => {
+    it("should use session name from session.created when available", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c" })
+      await hooks.event!(sessionCreated("s1", "my-feature"))
+      await hooks.event!(busy())
+      await hooks.event!(idle())
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("[session: my-feature]"))).toBe(true)
+    })
+
+    it("should use session name from session.updated when changed", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c" })
+      await hooks.event!(sessionCreated("s1", "old-name"))
+      await hooks.event!(sessionUpdated("s1", "renamed-feature"))
+      await hooks.event!(busy())
+      await hooks.event!(idle())
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("[session: renamed-feature]"))).toBe(true)
+    })
+
+    it("should fall back to session id when name is unknown", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c" })
+      await hooks.event!(busy())
+      await hooks.event!(idle())
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("[session: s1]"))).toBe(true)
+    })
+
+    it("should show session name in custom message", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c", message: "needs review" })
+      await hooks.event!(sessionCreated("s1", "bug-fix"))
+      await hooks.event!(busy())
+      await hooks.event!(idle())
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("text='needs review [session: bug-fix]'"))).toBe(true)
+    })
+
+    it("should track multiple sessions", async () => {
+      const { mock$, captured } = makeMock$()
+      const hooks = await opencodeTelegramPlugin({ $: mock$ } as any, { botToken: "t", chatId: "c" })
+      await hooks.event!(sessionCreated("s1", "feature-a"))
+      await hooks.event!(sessionCreated("s2", "feature-b"))
+      await (hooks as any)["tool.execute.before"]!({ tool: "ask", sessionID: "s2", callID: "c1" }, { args: {} })
+      await Bun.sleep(600)
+      expect(captured.some((c: string) => c.includes("[session: feature-b]"))).toBe(true)
     })
   })
 

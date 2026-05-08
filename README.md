@@ -70,6 +70,13 @@ Add the plugin to your `opencode.json`:
 | `message` | `"opencode agent is waiting for your input"` | Custom notification text |
 | `debug` | `false` | Log events to `/tmp/opencode-telegram-debug.log` |
 
+The notification message automatically includes the session name (set via Ctrl+P) or falls back to the session ID:
+
+```
+opencode agent is waiting for your input [session: my-feature]
+opencode agent is waiting for your input [session: s1]
+```
+
 ## Development
 
 ```bash
@@ -82,10 +89,13 @@ bun test           # run tests
 
 The plugin listens for opencode lifecycle events:
 
+- **session.created / session.updated**: captures the session name (set via Ctrl+P) for display in notifications
 - **session.status**: busy→idle transition → sends notification (debounced 500ms)
 - **session.idle**: fallback idle signal
 - **permission.updated**: agent asks for permission → sends notification
 - **permission.replied**: user responds → cancels pending notification
 - **tool.execute.before** (ask/question/confirm): agent is about to ask a question → sends notification
+
+Notifications include the session name (if set) or session ID, making it easy to identify which agent session needs attention.
 
 Uses `curl` via opencode's shell function to call the Telegram Bot API — no extra runtime dependencies.
